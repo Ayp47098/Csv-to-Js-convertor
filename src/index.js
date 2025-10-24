@@ -9,6 +9,23 @@ const apiRoutes = require('./routes/apiRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Flag to track if database is initialized
+let dbInitialized = false;
+
+// Middleware to initialize database on first request (for Vercel)
+app.use(async (req, res, next) => {
+  if (!dbInitialized && (process.env.VERCEL || process.env.NODE_ENV === 'production')) {
+    try {
+      await database.initializeDatabase();
+      dbInitialized = true;
+    } catch (err) {
+      console.error('Error initializing database:', err);
+      // Don't fail the request, just log it
+    }
+  }
+  next();
+});
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -39,6 +56,7 @@ async function startServer() {
   try {
     // Initialize database
     await database.initializeDatabase();
+    dbInitialized = true;
 
     // Start listening
     app.listen(PORT, () => {
@@ -54,13 +72,6 @@ async function startServer() {
 // Only start server if this is not being used by Vercel
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   startServer();
-}
-
-// Initialize database for production/Vercel
-if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-  database.initializeDatabase().catch(err => {
-    console.error('Failed to initialize database:', err);
-  });
 }
 
 module.exports = app;

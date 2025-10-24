@@ -40,7 +40,10 @@ const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Don't exit in production/Vercel - just log the error
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    process.exit(-1);
+  }
 });
 
 /**
@@ -48,7 +51,7 @@ pool.on('error', (err) => {
  */
 async function initializeDatabase() {
   try {
-    await pool.query(`
+    const query = `
       CREATE TABLE IF NOT EXISTS public.csv_records (
         id SERIAL PRIMARY KEY,
         name VARCHAR NOT NULL,
@@ -57,11 +60,16 @@ async function initializeDatabase() {
         additional_info JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
+    `;
+    
+    await pool.query(query);
     console.log('✓ Database schema initialized successfully');
   } catch (error) {
-    console.error('Error initializing database schema:', error);
-    throw error;
+    console.error('Error initializing database schema:', error.message);
+    // Don't throw in production - just log
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+      throw error;
+    }
   }
 }
 
