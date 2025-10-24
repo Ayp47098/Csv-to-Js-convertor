@@ -1,4 +1,5 @@
 const CSVProcessingService = require('../services/csvProcessingService');
+const database = require('../config/database');
 
 /**
  * CSV Upload Controller
@@ -30,6 +31,9 @@ class CSVController {
 
       // Process the CSV file
       const result = await CSVProcessingService.processCSVFile(req.file.path);
+
+      // Save records to Supabase
+      await database.insertRecords(result.records);
 
       res.status(200).json(result);
     } catch (error) {
@@ -66,6 +70,26 @@ class CSVController {
       message: 'CSV to JSON Converter API is running',
       timestamp: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Get all records from database
+   * GET /api/records
+   */
+  static async getRecords(req, res, next) {
+    try {
+      const records = await database.getAllRecords();
+      const count = records.length;
+
+      res.status(200).json({
+        success: true,
+        count,
+        records,
+      });
+    } catch (error) {
+      console.error('Get records error:', error);
+      next(error);
+    }
   }
 }
 

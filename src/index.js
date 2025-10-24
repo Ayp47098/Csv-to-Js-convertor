@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 require('dotenv').config();
+const database = require('./config/database');
 const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
 const apiRoutes = require('./routes/apiRoutes');
@@ -36,6 +37,9 @@ app.use(errorHandler);
  */
 async function startServer() {
   try {
+    // Initialize database
+    await database.initializeDatabase();
+
     // Start listening
     app.listen(PORT, () => {
       console.log(`\n✓ Server running on http://localhost:${PORT}`);

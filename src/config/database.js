@@ -49,7 +49,7 @@ pool.on('error', (err) => {
 async function initializeDatabase() {
   try {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS public.users (
+      CREATE TABLE IF NOT EXISTS public.csv_records (
         id SERIAL PRIMARY KEY,
         name VARCHAR NOT NULL,
         age INTEGER NOT NULL,
@@ -65,8 +65,69 @@ async function initializeDatabase() {
   }
 }
 
+/**
+ * Insert CSV records into database
+ */
+async function insertRecords(records) {
+  try {
+    for (const record of records) {
+      await pool.query(
+        `INSERT INTO public.csv_records (name, age, address, additional_info) 
+         VALUES ($1, $2, $3, $4)`,
+        [
+          record.name,
+          record.age,
+          record.address ? JSON.stringify(record.address) : null,
+          record.additional_info ? JSON.stringify(record.additional_info) : null,
+        ]
+      );
+    }
+    console.log(`✓ Inserted ${records.length} records into database`);
+    return true;
+  } catch (error) {
+    console.error('Error inserting records:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all records from database
+ */
+async function getAllRecords() {
+  try {
+    const result = await pool.query('SELECT * FROM public.csv_records ORDER BY id DESC');
+    return result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      age: row.age,
+      address: row.address ? JSON.parse(row.address) : null,
+      additional_info: row.additional_info ? JSON.parse(row.additional_info) : null,
+      created_at: row.created_at,
+    }));
+  } catch (error) {
+    console.error('Error fetching records:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get records count
+ */
+async function getRecordsCount() {
+  try {
+    const result = await pool.query('SELECT COUNT(*) as count FROM public.csv_records');
+    return result.rows[0].count;
+  } catch (error) {
+    console.error('Error fetching records count:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   pool,
   query: (text, params) => pool.query(text, params),
   initializeDatabase,
+  insertRecords,
+  getAllRecords,
+  getRecordsCount,
 };

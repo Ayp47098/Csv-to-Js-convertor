@@ -511,15 +511,50 @@
 
             <!-- Output Section -->
             <div class="section">
-                <h2>Output</h2>
+                <h2>Output & Records</h2>
                 
-                <!-- JSON Output -->
-                <div class="output-box" id="outputBox">
-                    <div style="color: #999; text-align: center; padding: 40px 20px;">
-                        Upload a CSV file to see the JSON output here
-                    </div>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="json">📄 JSON Output</button>
+                    <button class="tab-btn" data-tab="records">💾 All Records</button>
                 </div>
-                <button class="copy-btn" id="copyBtn" style="display: none;">📋 Copy JSON</button>
+
+                <!-- JSON Tab -->
+                <div class="tab-content active" id="json-tab">
+                    <div class="output-box" id="outputBox">
+                        <div style="color: #999; text-align: center; padding: 40px 20px;">
+                            Upload a CSV file to see the JSON output here
+                        </div>
+                    </div>
+                    <button class="copy-btn" id="copyBtn" style="display: none;">📋 Copy JSON</button>
+                </div>
+
+                <!-- Records Tab -->
+                <div class="tab-content" id="records-tab">
+                    <div class="users-count" id="usersCount" style="display: none;">
+                        <span id="userCountText">Total Records: 0</span>
+                    </div>
+                    <div class="users-table-wrapper">
+                        <table class="users-table" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Age</th>
+                                    <th>Address</th>
+                                    <th>City</th>
+                                    <th>State</th>
+                                    <th>Added</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr>
+                                    <td colspan="7" class="no-data">No records in database yet. Upload a CSV to populate.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn" id="refreshBtn" style="margin-top: 15px;">🔄 Refresh Records</button>
+                </div>
             </div>
         </div>
 
@@ -541,6 +576,9 @@
         const successMessage = document.getElementById('successMessage');
         const errorMessage = document.getElementById('errorMessage');
         const copyBtn = document.getElementById('copyBtn');
+        const tabs = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const refreshBtn = document.getElementById('refreshBtn');
 
         // Drag and drop
         uploadBox.addEventListener('click', () => csvFile.click());
@@ -648,6 +686,80 @@
                 }, 2000);
             });
         });
+
+        // Tab switching
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+                
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                tabContents.forEach(content => content.classList.remove('active'));
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+                
+                // Load records when records tab is clicked
+                if (tabName === 'records') {
+                    loadRecords();
+                }
+            });
+        });
+
+        // Refresh records button
+        refreshBtn.addEventListener('click', loadRecords);
+
+        // Load records from database
+        async function loadRecords() {
+            try {
+                const response = await fetch('/api/records');
+                const data = await response.json();
+                
+                if (response.ok && data.records) {
+                    displayRecords(data.records);
+                } else {
+                    showError('Failed to load records');
+                }
+            } catch (error) {
+                console.error('Error loading records:', error);
+                showError('Error loading records: ' + error.message);
+            }
+        }
+
+        // Display records in table
+        function displayRecords(records) {
+            const tableBody = document.getElementById('usersTableBody');
+            const userCount = document.getElementById('usersCount');
+            const userCountText = document.getElementById('userCountText');
+            
+            if (records.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" class="no-data">No records in database</td></tr>';
+                userCount.style.display = 'none';
+                return;
+            }
+            
+            tableBody.innerHTML = '';
+            records.forEach((record, index) => {
+                const addressLine1 = record.address?.line1 || '-';
+                const city = record.address?.city || '-';
+                const state = record.address?.state || '-';
+                const createdDate = new Date(record.created_at).toLocaleString();
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="id">${record.id}</td>
+                    <td class="name">${record.name || '-'}</td>
+                    <td class="age">${record.age || '-'}</td>
+                    <td class="address">${addressLine1}</td>
+                    <td class="city">${city}</td>
+                    <td class="state">${state}</td>
+                    <td>${createdDate}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            userCountText.textContent = `Total Records: ${records.length}`;
+            userCount.style.display = 'block';
+        }
 
         function showSuccess(message) {
             successMessage.textContent = message;

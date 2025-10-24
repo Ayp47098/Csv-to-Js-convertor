@@ -33,6 +33,7 @@ const upload = multer({
 // Routes
 router.post('/csv/upload', upload.single('file'), CSVController.uploadCSV);
 router.get('/csv/report', CSVController.getAgeDistribution);
+router.get('/records', CSVController.getRecords);
 router.get('/health', CSVController.healthCheck);
 
 module.exports = router;
