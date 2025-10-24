@@ -2,101 +2,114 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 /**
- * Parse DATABASE_URL to individual parameters
+ * Retry logic for database connections
  */
-function parseDatabaseUrl(url) {
-  try {
-    const dbUrl = new URL(url);
-    return {
-      host: dbUrl.hostname,
-      port: dbUrl.port || 5432,
-      user: dbUrl.username,
-      password: dbUrl.password,
-      database: dbUrl.pathname.slice(1),
-    };
-  } catch (err) {
-    console.error('Failed to parse DATABASE_URL:', err);
-    return null;
+async function retryConnection(fn, maxRetries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      console.error(`Connection attempt ${attempt} failed: ${error.message}`);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      console.log(`Retrying in ${delay}ms... (${attempt}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 }
 
 /**
  * PostgreSQL connection pool configuration
+ * Prioritizes internal DB variables over DATABASE_URL
  */
 let poolConfig;
 
-if (process.env.DATABASE_URL) {
-  // Parse DATABASE_URL to individual parameters (better IPv4 support)
-  const dbParams = parseDatabaseUrl(process.env.DATABASE_URL);
-  
-  if (dbParams) {
-    poolConfig = {
-      host: dbParams.host,
-      port: dbParams.port,
-      user: dbParams.user,
-      password: dbParams.password,
-      database: dbParams.database,
-      ssl: { rejectUnauthorized: false },
-      family: 4, // Force IPv4
-      connectionTimeoutMillis: 30000,
-      idleTimeoutMillis: 30000,
-      max: 20,
-    };
-    console.log(`Using DATABASE_URL connection: host=${dbParams.host}, port=${dbParams.port}`);
-  } else {
-    throw new Error('Invalid DATABASE_URL format');
-  }
-} else {
-  // Use individual DB_* environment variables
+// Use individual DB_* environment variables (better for internal connections)
+if (process.env.DB_HOST) {
   poolConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || 5432),
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_NAME || 'csv_converter',
-    ssl: process.env.DB_HOST && process.env.DB_HOST.includes('supabase') 
-      ? { rejectUnauthorized: false } 
-      : false,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'postgres',
+    ssl: {
+      rejectUnauthorized: false, // Required for Supabase
+    },
     family: 4, // Force IPv4
-    connectionTimeoutMillis: 30000,
+    connectionTimeoutMillis: 15000, // 15 seconds
+    idleTimeoutMillis: 30000, // 30 seconds
+    max: 20, // Max connections
+    statement_timeout: 30000, // 30 seconds per query
+  };
+  console.log(`✓ Using individual DB config: host=${poolConfig.host}, port=${poolConfig.port}, db=${poolConfig.database}`);
+} else if (process.env.DATABASE_URL) {
+  // Fallback: Parse DATABASE_URL to individual parameters
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  poolConfig = {
+    host: dbUrl.hostname,
+    port: parseInt(dbUrl.port || 5432),
+    user: dbUrl.username,
+    password: dbUrl.password,
+    database: dbUrl.pathname.slice(1),
+    ssl: {
+      rejectUnauthorized: false,
+    },
+    family: 4,
+    connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
     max: 20,
+    statement_timeout: 30000,
   };
-  console.log(`Using individual DB_* config: host=${poolConfig.host}, port=${poolConfig.port}`);
+  console.log(`✓ Using DATABASE_URL connection: host=${poolConfig.host}, port=${poolConfig.port}`);
+} else {
+  throw new Error('DATABASE_URL or DB_HOST not configured');
 }
 
 const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
+  console.error('Unexpected error on idle client:', err.message);
   // Don't exit in production/Vercel - just log the error
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     process.exit(-1);
   }
 });
 
+pool.on('connect', () => {
+  console.log('✓ Database connection established');
+});
+
 /**
- * Initialize database schema
+ * Initialize database schema with retry logic
  */
 async function initializeDatabase() {
   try {
-    const query = `
-      CREATE TABLE IF NOT EXISTS public.csv_records (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR NOT NULL,
-        age INTEGER NOT NULL,
-        address JSONB,
-        additional_info JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-    
-    await pool.query(query);
-    console.log('✓ Database schema initialized successfully');
+    await retryConnection(async () => {
+      const client = await pool.connect();
+      try {
+        // Create table if it doesn't exist
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS public.csv_records (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR NOT NULL,
+            age INTEGER NOT NULL,
+            address JSONB,
+            additional_info JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        console.log('✓ Database schema initialized successfully');
+      } finally {
+        client.release();
+      }
+    }, 3, 2000);
   } catch (error) {
     console.error('Error initializing database schema:', error.message);
     // Don't throw in production - just log
-    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL && !process.env.RENDER) {
       throw error;
     }
   }
