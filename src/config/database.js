@@ -10,14 +10,13 @@ if (process.env.DATABASE_URL) {
   // Use DATABASE_URL if provided (easier for cloud deployments)
   poolConfig = {
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase') 
-      ? { rejectUnauthorized: false } 
-      : false,
+    ssl: { rejectUnauthorized: false },
     family: 4, // Force IPv4
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
     max: 20,
   };
+  console.log('Using DATABASE_URL connection');
 } else {
   // Use individual DB_* environment variables
   poolConfig = {
@@ -34,6 +33,7 @@ if (process.env.DATABASE_URL) {
     idleTimeoutMillis: 30000,
     max: 20,
   };
+  console.log(`Using individual DB_* config: host=${poolConfig.host}, port=${poolConfig.port}`);
 }
 
 const pool = new Pool(poolConfig);
