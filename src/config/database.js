@@ -1,22 +1,5 @@
 const { Pool } = require('pg');
-const dns = require('dns').promises;
 require('dotenv').config();
-
-/**
- * Resolve hostname to IPv4 address
- */
-async function resolveHostIPv4(hostname) {
-  try {
-    const result = await dns.resolve4(hostname);
-    if (result.length > 0) {
-      console.log(`✓ Resolved ${hostname} to IPv4: ${result[0]}`);
-      return result[0];
-    }
-  } catch (error) {
-    console.warn(`Failed to resolve ${hostname} to IPv4: ${error.message}`);
-  }
-  return hostname; // Fallback to hostname if resolution fails
-}
 
 /**
  * Retry logic for database connections
@@ -40,68 +23,56 @@ async function retryConnection(fn, maxRetries = 3, delay = 1000) {
 
 /**
  * PostgreSQL connection pool configuration
- * Prioritizes internal DB variables over DATABASE_URL
+ * Uses PgBouncer connection pooler for better reliability on cloud platforms
  */
 let poolConfig;
-let resolvedHost;
 
 // Use individual DB_* environment variables (better for internal connections)
 if (process.env.DB_HOST) {
-  // Resolve hostname to IPv4 address to avoid IPv6 issues
-  resolveHostIPv4(process.env.DB_HOST).then(ipv4Host => {
-    poolConfig.host = ipv4Host; // Update config with resolved IP
-  }).catch(err => {
-    console.warn(`Failed to resolve host to IPv4: ${err.message}`);
-  });
+  // Use pgbouncer port 6543 for connection pooling on cloud platforms
+  // This avoids IPv6 issues and provides better connection management
+  const port = process.env.DB_PORT || 6543; // Default to pgbouncer port
+  const isUsingPooler = port === 6543 || port === '6543';
   
   poolConfig = {
-    host: process.env.DB_HOST, // Will be updated to IPv4 above
-    port: parseInt(process.env.DB_PORT || 5432),
+    host: process.env.DB_HOST,
+    port: parseInt(port),
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'postgres',
     ssl: {
       rejectUnauthorized: false, // Required for Supabase
     },
-    family: 4, // Force IPv4
     connectionTimeoutMillis: 15000, // 15 seconds
     idleTimeoutMillis: 30000, // 30 seconds
     max: 20, // Max connections
     statement_timeout: 30000, // 30 seconds per query
-    keepalives: 1, // Enable TCP keepalives
-    keepalives_idle: 30, // Start keepalives after 30 seconds of inactivity
   };
-  console.log(`✓ Using individual DB config: host=${poolConfig.host}, port=${poolConfig.port}, db=${poolConfig.database}`);
+  
+  if (isUsingPooler) {
+    console.log(`✓ Using PgBouncer connection pooler: host=${poolConfig.host}, port=${poolConfig.port}, db=${poolConfig.database}`);
+  } else {
+    console.log(`✓ Using direct database connection: host=${poolConfig.host}, port=${poolConfig.port}, db=${poolConfig.database}`);
+  }
 } else if (process.env.DATABASE_URL) {
   // Fallback: Parse DATABASE_URL to individual parameters
   const dbUrl = new URL(process.env.DATABASE_URL);
-  const dbHost = dbUrl.hostname;
-  
-  // Resolve to IPv4
-  resolveHostIPv4(dbHost).then(ipv4Host => {
-    poolConfig.host = ipv4Host;
-  }).catch(err => {
-    console.warn(`Failed to resolve host to IPv4: ${err.message}`);
-  });
   
   poolConfig = {
-    host: dbHost, // Will be updated to IPv4 above
-    port: parseInt(dbUrl.port || 5432),
+    host: dbUrl.hostname,
+    port: parseInt(dbUrl.port || 6543), // Default to pgbouncer port
     user: dbUrl.username,
     password: dbUrl.password,
     database: dbUrl.pathname.slice(1),
     ssl: {
       rejectUnauthorized: false,
     },
-    family: 4,
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
     max: 20,
     statement_timeout: 30000,
-    keepalives: 1,
-    keepalives_idle: 30,
   };
-  console.log(`✓ Using DATABASE_URL connection: host=${poolConfig.host}, port=${poolConfig.port}`);
+  console.log(`✓ Using DATABASE_URL with PgBouncer: host=${poolConfig.host}, port=${poolConfig.port}`);
 } else {
   throw new Error('DATABASE_URL or DB_HOST not configured');
 }
@@ -110,8 +81,8 @@ const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client:', err.message);
-  // Don't exit in production/Vercel - just log the error
-  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  // Don't exit in production/cloud - just log the error
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL && !process.env.RENDER) {
     process.exit(-1);
   }
 });
