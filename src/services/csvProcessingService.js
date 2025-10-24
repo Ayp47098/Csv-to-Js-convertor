@@ -2,11 +2,10 @@ const fs = require('fs').promises;
 const CSVParser = require('../utils/csvParser');
 const DataTransformer = require('../utils/dataTransformer');
 const AgeDistribution = require('../utils/ageDistribution');
-const database = require('../config/database');
 
 /**
  * CSV Processing Service
- * Handles CSV parsing, validation, database insertion, and reporting
+ * Handles CSV parsing, validation, and reporting
  */
 class CSVProcessingService {
   /**
@@ -28,10 +27,7 @@ class CSVProcessingService {
       // Step 4: Transform records
       const transformedRecords = DataTransformer.transformRecords(parsedRecords);
 
-      // Step 5: Insert into database
-      const insertedCount = await this.insertRecordsToDB(transformedRecords);
-
-      // Step 6: Calculate and print age distribution
+      // Step 5: Calculate and print age distribution
       const distribution = AgeDistribution.calculate(transformedRecords);
       AgeDistribution.printReport(distribution);
 
@@ -40,9 +36,10 @@ class CSVProcessingService {
 
       return {
         success: true,
-        totalRecords: insertedCount,
+        totalRecords: transformedRecords.length,
+        records: transformedRecords,
         ageDistribution: distribution,
-        message: `Successfully processed ${insertedCount} records`,
+        message: `Successfully processed ${transformedRecords.length} records`,
       };
     } catch (error) {
       // Clean up on error
@@ -57,60 +54,29 @@ class CSVProcessingService {
   }
 
   /**
-   * Insert transformed records into database
-   * @param {Array} records - Array of transformed records
-   * @returns {Promise<number>} Number of inserted records
+   * Get all cached records from memory
+   * @returns {Promise<Array>} Array of processed records
    */
-  static async insertRecordsToDB(records) {
-    const query = `
-      INSERT INTO public.users (name, age, address, additional_info)
-      VALUES ($1, $2, $3, $4)
-    `;
-
-    let inserted = 0;
-
-    for (const record of records) {
-      try {
-        await database.query(query, [
-          record.name,
-          record.age,
-          record.address ? JSON.stringify(record.address) : null,
-          record.additional_info ? JSON.stringify(record.additional_info) : null,
-        ]);
-        inserted++;
-      } catch (error) {
-        console.error(`Error inserting record: ${JSON.stringify(record)}`, error);
-        throw new Error(
-          `Database insertion failed for record: ${record.name}. ${error.message}`
-        );
-      }
-    }
-
-    return inserted;
-  }
-
-  /**
-   * Get all users from database
-   * @returns {Promise<Array>} Array of user records
-   */
-  static async getAllUsers() {
+  static async getAllRecords() {
     try {
-      const result = await database.query('SELECT * FROM public.users ORDER BY id DESC');
-      return result.rows;
+      // In-memory storage for processed records
+      if (!CSVProcessingService.cachedRecords) {
+        CSVProcessingService.cachedRecords = [];
+      }
+      return CSVProcessingService.cachedRecords;
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching records:', error);
       throw error;
     }
   }
 
   /**
-   * Get age distribution statistics
+   * Get age distribution statistics from cached records
    * @returns {Promise<Object>} Age distribution data
    */
   static async getAgeDistribution() {
     try {
-      const result = await database.query('SELECT age FROM public.users');
-      const records = result.rows;
+      const records = await this.getAllRecords();
       return AgeDistribution.calculate(records);
     } catch (error) {
       console.error('Error calculating age distribution:', error);
@@ -119,15 +85,16 @@ class CSVProcessingService {
   }
 
   /**
-   * Delete all users (for testing/reset)
+   * Clear all cached records
    * @returns {Promise<number>} Number of deleted records
    */
-  static async deleteAllUsers() {
+  static async deleteAllRecords() {
     try {
-      const result = await database.query('DELETE FROM public.users');
-      return result.rowCount;
+      const count = CSVProcessingService.cachedRecords?.length || 0;
+      CSVProcessingService.cachedRecords = [];
+      return count;
     } catch (error) {
-      console.error('Error deleting users:', error);
+      console.error('Error clearing records:', error);
       throw error;
     }
   }

@@ -39,27 +39,8 @@ class CSVController {
   }
 
   /**
-   * Get all users from database
-   * GET /api/users
-   */
-  static async getUsers(req, res, next) {
-    try {
-      const users = await CSVProcessingService.getAllUsers();
-
-      res.status(200).json({
-        success: true,
-        count: users.length,
-        data: users,
-      });
-    } catch (error) {
-      console.error('Get users error:', error);
-      next(error);
-    }
-  }
-
-  /**
    * Get age distribution statistics
-   * GET /api/statistics/age-distribution
+   * GET /api/csv/report
    */
   static async getAgeDistribution(req, res, next) {
     try {
@@ -85,25 +66,6 @@ class CSVController {
       message: 'CSV to JSON Converter API is running',
       timestamp: new Date().toISOString(),
     });
-  }
-
-  /**
-   * Reset database (delete all users)
-   * DELETE /api/users/reset
-   */
-  static async resetDatabase(req, res, next) {
-    try {
-      const deletedCount = await CSVProcessingService.deleteAllUsers();
-
-      res.status(200).json({
-        success: true,
-        message: `Deleted ${deletedCount} records from database`,
-        deletedCount,
-      });
-    } catch (error) {
-      console.error('Reset database error:', error);
-      next(error);
-    }
   }
 }
 

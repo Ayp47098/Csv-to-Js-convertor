@@ -32,9 +32,7 @@ const upload = multer({
 
 // Routes
 router.post('/csv/upload', upload.single('file'), CSVController.uploadCSV);
-router.get('/users', CSVController.getUsers);
-router.get('/statistics/age-distribution', CSVController.getAgeDistribution);
-router.delete('/users/reset', CSVController.resetDatabase);
+router.get('/csv/report', CSVController.getAgeDistribution);
 router.get('/health', CSVController.healthCheck);
 
 module.exports = router;
