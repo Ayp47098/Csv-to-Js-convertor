@@ -4,14 +4,39 @@ require('dotenv').config();
 /**
  * PostgreSQL connection pool configuration
  */
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'csv_converter',
-  ssl: process.env.DB_HOST && process.env.DB_HOST.includes('supabase') ? { rejectUnauthorized: false } : false,
-});
+let poolConfig;
+
+if (process.env.DATABASE_URL) {
+  // Use DATABASE_URL if provided (easier for cloud deployments)
+  poolConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase') 
+      ? { rejectUnauthorized: false } 
+      : false,
+    family: 4, // Force IPv4
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    max: 20,
+  };
+} else {
+  // Use individual DB_* environment variables
+  poolConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_NAME || 'csv_converter',
+    ssl: process.env.DB_HOST && process.env.DB_HOST.includes('supabase') 
+      ? { rejectUnauthorized: false } 
+      : false,
+    family: 4, // Force IPv4
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    max: 20,
+  };
+}
+
+const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
