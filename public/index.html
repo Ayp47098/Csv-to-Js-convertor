@@ -513,46 +513,13 @@
             <div class="section">
                 <h2>Output</h2>
                 
-                <div class="tabs">
-                    <button class="tab-btn active" data-tab="json">JSON</button>
-                    <button class="tab-btn" data-tab="users">Users Database</button>
-                </div>
-
-                <!-- JSON Tab -->
-                <div class="tab-content active" id="json-tab">
-                    <div class="output-box" id="outputBox">
-                        <div style="color: #999; text-align: center; padding: 40px 20px;">
-                            Upload a CSV file to see the JSON output here
-                        </div>
-                    </div>
-                    <button class="copy-btn" id="copyBtn" style="display: none;">📋 Copy JSON</button>
-                </div>
-
-                <!-- Users Tab -->
-                <div class="tab-content" id="users-tab">
-                    <div class="users-count" id="usersCount" style="display: none;">
-                        <span id="userCountText">Total Users: 0</span>
-                    </div>
-                    <div class="users-table-wrapper">
-                        <table class="users-table" id="usersTable">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Name</th>
-                                    <th>Age</th>
-                                    <th>Address Line 1</th>
-                                    <th>City</th>
-                                    <th>State</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usersTableBody">
-                                <tr>
-                                    <td colspan="6" class="no-data">No users in database yet. Upload a CSV to populate.</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <!-- JSON Output -->
+                <div class="output-box" id="outputBox">
+                    <div style="color: #999; text-align: center; padding: 40px 20px;">
+                        Upload a CSV file to see the JSON output here
                     </div>
                 </div>
+                <button class="copy-btn" id="copyBtn" style="display: none;">📋 Copy JSON</button>
             </div>
         </div>
 
@@ -574,8 +541,6 @@
         const successMessage = document.getElementById('successMessage');
         const errorMessage = document.getElementById('errorMessage');
         const copyBtn = document.getElementById('copyBtn');
-        const tabs = document.querySelectorAll('.tab-btn');
-        const tabContents = document.querySelectorAll('.tab-content');
 
         // Drag and drop
         uploadBox.addEventListener('click', () => csvFile.click());
@@ -646,9 +611,6 @@
                     // Display statistics
                     displayStatistics(data.ageDistribution);
                     
-                    // Load users from database
-                    loadUsers();
-                    
                     copyBtn.style.display = 'block';
                 } else {
                     showError(data.error || 'Upload failed');
@@ -674,65 +636,6 @@
             document.getElementById('stat-more60').textContent = `${dist.greaterThan60.count} (${dist.greaterThan60.percentage}%)`;
             statistics.classList.add('show');
         }
-
-        async function loadUsers() {
-            try {
-                const response = await fetch('/api/users');
-                const data = await response.json();
-                
-                if (response.ok) {
-                    displayUsers(data.data);
-                }
-            } catch (error) {
-                console.error('Error loading users:', error);
-            }
-        }
-
-        function displayUsers(users) {
-            const tableBody = document.getElementById('usersTableBody');
-            const userCount = document.getElementById('usersCount');
-            const userCountText = document.getElementById('userCountText');
-            
-            if (users.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="6" class="no-data">No users found in database</td></tr>';
-                userCount.style.display = 'none';
-                return;
-            }
-            
-            tableBody.innerHTML = '';
-            users.forEach(user => {
-                const addressLine1 = user.address?.line1 || '-';
-                const city = user.address?.city || '-';
-                const state = user.address?.state || '-';
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="id">${user.id}</td>
-                    <td class="name">${user.name || '-'}</td>
-                    <td class="age">${user.age || '-'}</td>
-                    <td class="address">${addressLine1}</td>
-                    <td class="city">${city}</td>
-                    <td class="state">${state}</td>
-                `;
-                tableBody.appendChild(row);
-            });
-            
-            userCountText.textContent = `Total Users: ${users.length}`;
-            userCount.style.display = 'block';
-        }
-
-        // Tab switching
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const tabName = tab.getAttribute('data-tab');
-                
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                tabContents.forEach(content => content.classList.remove('active'));
-                document.getElementById(`${tabName}-tab`).classList.add('active');
-            });
-        });
 
         // Copy JSON
         copyBtn.addEventListener('click', () => {
