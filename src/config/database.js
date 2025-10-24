@@ -29,14 +29,22 @@ let poolConfig;
 
 // Use individual DB_* environment variables (better for internal connections)
 if (process.env.DB_HOST) {
-  // Use pgbouncer port 6543 for connection pooling on cloud platforms
-  // This avoids IPv6 issues and provides better connection management
-  const port = process.env.DB_PORT || 6543; // Default to pgbouncer port
-  const isUsingPooler = port === 6543 || port === '6543';
+  // Force PgBouncer port 6543 on cloud platforms to avoid IPv6 issues
+  // On local development (NODE_ENV=development), allow port 5432
+  let port = process.env.DB_PORT || 6543;
+  
+  // If on cloud platform (Render, Vercel, etc.), force port 6543
+  if ((process.env.RENDER || process.env.VERCEL) && port === '5432') {
+    console.log('ℹ Detected cloud platform - forcing PgBouncer port 6543');
+    port = 6543;
+  }
+  
+  port = parseInt(port);
+  const isUsingPooler = port === 6543;
   
   poolConfig = {
     host: process.env.DB_HOST,
-    port: parseInt(port),
+    port: port,
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'postgres',
