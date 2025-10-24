@@ -1,5 +1,22 @@
 const { Pool } = require('pg');
+const dns = require('dns').promises;
 require('dotenv').config();
+
+/**
+ * Resolve hostname to IPv4 address
+ */
+async function resolveHostIPv4(hostname) {
+  try {
+    const result = await dns.resolve4(hostname);
+    if (result.length > 0) {
+      console.log(`✓ Resolved ${hostname} to IPv4: ${result[0]}`);
+      return result[0];
+    }
+  } catch (error) {
+    console.warn(`Failed to resolve ${hostname} to IPv4: ${error.message}`);
+  }
+  return hostname; // Fallback to hostname if resolution fails
+}
 
 /**
  * Retry logic for database connections
@@ -26,11 +43,19 @@ async function retryConnection(fn, maxRetries = 3, delay = 1000) {
  * Prioritizes internal DB variables over DATABASE_URL
  */
 let poolConfig;
+let resolvedHost;
 
 // Use individual DB_* environment variables (better for internal connections)
 if (process.env.DB_HOST) {
+  // Resolve hostname to IPv4 address to avoid IPv6 issues
+  resolveHostIPv4(process.env.DB_HOST).then(ipv4Host => {
+    poolConfig.host = ipv4Host; // Update config with resolved IP
+  }).catch(err => {
+    console.warn(`Failed to resolve host to IPv4: ${err.message}`);
+  });
+  
   poolConfig = {
-    host: process.env.DB_HOST,
+    host: process.env.DB_HOST, // Will be updated to IPv4 above
     port: parseInt(process.env.DB_PORT || 5432),
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD,
@@ -43,13 +68,24 @@ if (process.env.DB_HOST) {
     idleTimeoutMillis: 30000, // 30 seconds
     max: 20, // Max connections
     statement_timeout: 30000, // 30 seconds per query
+    keepalives: 1, // Enable TCP keepalives
+    keepalives_idle: 30, // Start keepalives after 30 seconds of inactivity
   };
   console.log(`✓ Using individual DB config: host=${poolConfig.host}, port=${poolConfig.port}, db=${poolConfig.database}`);
 } else if (process.env.DATABASE_URL) {
   // Fallback: Parse DATABASE_URL to individual parameters
   const dbUrl = new URL(process.env.DATABASE_URL);
+  const dbHost = dbUrl.hostname;
+  
+  // Resolve to IPv4
+  resolveHostIPv4(dbHost).then(ipv4Host => {
+    poolConfig.host = ipv4Host;
+  }).catch(err => {
+    console.warn(`Failed to resolve host to IPv4: ${err.message}`);
+  });
+  
   poolConfig = {
-    host: dbUrl.hostname,
+    host: dbHost, // Will be updated to IPv4 above
     port: parseInt(dbUrl.port || 5432),
     user: dbUrl.username,
     password: dbUrl.password,
@@ -62,6 +98,8 @@ if (process.env.DB_HOST) {
     idleTimeoutMillis: 30000,
     max: 20,
     statement_timeout: 30000,
+    keepalives: 1,
+    keepalives_idle: 30,
   };
   console.log(`✓ Using DATABASE_URL connection: host=${poolConfig.host}, port=${poolConfig.port}`);
 } else {
