@@ -33,7 +33,7 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 /**
- * Start server
+ * Start server - for local development
  */
 async function startServer() {
   try {
@@ -51,6 +51,16 @@ async function startServer() {
   }
 }
 
-startServer();
+// Only start server if this is not being used by Vercel
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  startServer();
+}
+
+// Initialize database for production/Vercel
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+  database.initializeDatabase().catch(err => {
+    console.error('Failed to initialize database:', err);
+  });
+}
 
 module.exports = app;
