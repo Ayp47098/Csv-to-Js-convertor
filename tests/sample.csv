@@ -1,0 +1,13 @@
+name.firstName,name.lastName,age,address.line1,address.line2,address.city,address.state,gender
+Rohit,Prasad,35,A-563 Rakshak Society,Near New Pune Road,Pune,Maharashtra,male
+Priya,Kumar,28,123 Main Street,Apt 4B,Mumbai,Maharashtra,female
+Amit,Sharma,45,Sector 15,Phase 2,Noida,Uttar Pradesh,male
+Sneha,Desai,22,Koramangala,Block 5,Bangalore,Karnataka,female
+Rajesh,Patel,58,Chandni Chowk,Old Delhi,Delhi,Delhi,male
+Anjali,Singh,19,Karol Bagh,Plot 12,Delhi,Delhi,female
+Vikram,Verma,42,Salt Lake City,Block F,Kolkata,West Bengal,male
+Neha,Gupta,31,Whitefield,Tech Park,Bangalore,Karnataka,female
+Arun,Nair,61,Kochi Marina,Near Port,Kochi,Kerala,male
+Divya,Mishra,25,Thane City,East Side,Mumbai,Maharashtra,female
+Sanjay,Rao,48,Pune Station,Railway Area,Pune,Maharashtra,male
+Pooja,Reddy,27,Hyderabad Hi-Tech City,Tech Building,Hyderabad,Telangana,female

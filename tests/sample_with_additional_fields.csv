@@ -1,0 +1,11 @@
+name.firstName,name.lastName,age,address.line1,address.city,department,designation
+John,Doe,25,456 Oak Lane,San Francisco,Engineering,Software Engineer
+Jane,Smith,35,789 Pine Road,New York,Sales,Sales Manager
+Robert,Johnson,45,321 Elm Street,Chicago,HR,HR Manager
+Emily,Davis,22,654 Maple Avenue,Boston,Engineering,Junior Developer
+Michael,Wilson,55,987 Cedar Lane,Seattle,Management,Director
+Sarah,Brown,28,147 Birch Road,Austin,Engineering,Senior Developer
+David,Miller,38,258 Spruce Lane,Denver,Sales,Account Executive
+Jessica,Taylor,32,369 Willow Avenue,Portland,Marketing,Marketing Manager
+James,Anderson,61,741 Ash Road,Phoenix,Management,VP
+Lisa,Thomas,26,852 Oak Lane,Austin,Engineering,Software Engineer
