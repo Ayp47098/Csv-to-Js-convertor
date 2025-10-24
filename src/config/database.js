@@ -2,21 +2,50 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 /**
+ * Parse DATABASE_URL to individual parameters
+ */
+function parseDatabaseUrl(url) {
+  try {
+    const dbUrl = new URL(url);
+    return {
+      host: dbUrl.hostname,
+      port: dbUrl.port || 5432,
+      user: dbUrl.username,
+      password: dbUrl.password,
+      database: dbUrl.pathname.slice(1),
+    };
+  } catch (err) {
+    console.error('Failed to parse DATABASE_URL:', err);
+    return null;
+  }
+}
+
+/**
  * PostgreSQL connection pool configuration
  */
 let poolConfig;
 
 if (process.env.DATABASE_URL) {
-  // Use DATABASE_URL if provided (easier for cloud deployments)
-  poolConfig = {
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    family: 4, // Force IPv4
-    connectionTimeoutMillis: 30000,
-    idleTimeoutMillis: 30000,
-    max: 20,
-  };
-  console.log('Using DATABASE_URL connection');
+  // Parse DATABASE_URL to individual parameters (better IPv4 support)
+  const dbParams = parseDatabaseUrl(process.env.DATABASE_URL);
+  
+  if (dbParams) {
+    poolConfig = {
+      host: dbParams.host,
+      port: dbParams.port,
+      user: dbParams.user,
+      password: dbParams.password,
+      database: dbParams.database,
+      ssl: { rejectUnauthorized: false },
+      family: 4, // Force IPv4
+      connectionTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
+      max: 20,
+    };
+    console.log(`Using DATABASE_URL connection: host=${dbParams.host}, port=${dbParams.port}`);
+  } else {
+    throw new Error('Invalid DATABASE_URL format');
+  }
 } else {
   // Use individual DB_* environment variables
   poolConfig = {
