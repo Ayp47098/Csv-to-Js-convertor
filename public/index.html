@@ -739,9 +739,29 @@
             
             tableBody.innerHTML = '';
             records.forEach((record, index) => {
-                const addressLine1 = record.address?.line1 || '-';
-                const city = record.address?.city || '-';
-                const state = record.address?.state || '-';
+                // Handle address parsing - it could be an object or null
+                let addressLine1 = '-';
+                let city = '-';
+                let state = '-';
+                
+                if (record.address) {
+                    if (typeof record.address === 'string') {
+                        // If it's a string, try to parse it as JSON
+                        try {
+                            const addr = JSON.parse(record.address);
+                            addressLine1 = addr?.line1 || addr?.address || '-';
+                            city = addr?.city || '-';
+                            state = addr?.state || '-';
+                        } catch (e) {
+                            addressLine1 = record.address;
+                        }
+                    } else if (typeof record.address === 'object') {
+                        addressLine1 = record.address?.line1 || record.address?.address || '-';
+                        city = record.address?.city || '-';
+                        state = record.address?.state || '-';
+                    }
+                }
+                
                 const createdDate = new Date(record.created_at).toLocaleString();
                 
                 const row = document.createElement('tr');

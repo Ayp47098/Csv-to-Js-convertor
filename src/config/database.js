@@ -96,14 +96,45 @@ async function insertRecords(records) {
 async function getAllRecords() {
   try {
     const result = await pool.query('SELECT * FROM public.csv_records ORDER BY id DESC');
-    return result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      age: row.age,
-      address: row.address ? JSON.parse(row.address) : null,
-      additional_info: row.additional_info ? JSON.parse(row.additional_info) : null,
-      created_at: row.created_at,
-    }));
+    return result.rows.map(row => {
+      let addressData = null;
+      
+      // Handle address parsing - it comes as JSONB from database
+      if (row.address) {
+        if (typeof row.address === 'string') {
+          try {
+            addressData = JSON.parse(row.address);
+          } catch (e) {
+            addressData = row.address;
+          }
+        } else {
+          // PostgreSQL returns JSONB as objects directly
+          addressData = row.address;
+        }
+      }
+      
+      let additionalData = null;
+      if (row.additional_info) {
+        if (typeof row.additional_info === 'string') {
+          try {
+            additionalData = JSON.parse(row.additional_info);
+          } catch (e) {
+            additionalData = row.additional_info;
+          }
+        } else {
+          additionalData = row.additional_info;
+        }
+      }
+      
+      return {
+        id: row.id,
+        name: row.name,
+        age: row.age,
+        address: addressData,
+        additional_info: additionalData,
+        created_at: row.created_at,
+      };
+    });
   } catch (error) {
     console.error('Error fetching records:', error);
     throw error;
